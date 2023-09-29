@@ -1,4 +1,4 @@
-# Lit PKP claim demo for NodeJS enviorment
+# Lit PKP Claim Demo for NodeJS Enviorment
 
 Demo for showcasing claimable key flow, `Auth Method` used in this demo is `stytch` showcasing
 - How to derive a key from a stytch auth method type

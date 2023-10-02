@@ -19,7 +19,7 @@ if (!STYTCH_PROJECT_ID || !STYTCH_SECRET) {
   throw Error("Could not find stytch project secret or id in enviorment");
 }
 
-if (process.argv.length >= 3) {
+if (process.argv.length < 3) {
   throw Error("Please provide either --lookup or --claim flag");
 }
 

@@ -10,8 +10,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@lit-protocol/lit-auth-client": "3.0.4",
-    "@lit-protocol/lit-node-client-nodejs": "3.0.4",
+    "@lit-protocol/lit-auth-client": "3.0.5",
+    "@lit-protocol/lit-node-client-nodejs": "3.0.5",
     "@lit-protocol/pkp-ethers": "3.0.4",
     "@types/node": "^20.7.2",
     "@types/prompts": "^2.4.4",

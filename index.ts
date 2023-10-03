@@ -83,7 +83,7 @@ const session = authClient.initProvider<StytchOtpProvider>(
 const authMethod = await session.authenticate({
   accessToken: sessionStatus.session_jwt,
 });
-const publicKey = await session.computPublicKeyFromAuthMethod(authMethod);
+const publicKey = await session.computePublicKeyFromAuthMethod(authMethod);
 console.log("local public key computed: ", publicKey);
 
 if (process.argv.length >= 3 && process.argv[2] === "--claim") {

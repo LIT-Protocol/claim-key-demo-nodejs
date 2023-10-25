@@ -31,12 +31,12 @@ const client = new stytch.Client({
 
 const emailResponse = await prompts({
   type: "text",
-  name: "email",
-  message: "Enter your email:",
+  name: "phone",
+  message: "Enter your phone number",
 });
 
 const stytchResponse = await client.otps.sms.loginOrCreate({
-  phone_number: emailResponse.email,
+  phone_number: emailResponse.phone,
 });
 
 const otpResponse = await prompts({

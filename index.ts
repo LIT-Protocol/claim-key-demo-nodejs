@@ -87,11 +87,42 @@ const authMethod = await session.authenticate({
 const publicKey = await session.computePublicKeyFromAuthMethod(authMethod);
 console.log("local public key computed: ", publicKey);
 
-if (process.argv.length >= 3 && process.argv[2] === "--claim") {
+if (process.argv.includes("--claim")) {
   let claimResp = await session.claimKeyId({
     authMethod,
   });
   console.log("claim response public key: ", claimResp.pubkey);
+  const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
+  const sessionKey = litNodeClient.getSessionKey();
+  const signatures = await session.getSessionSigs({
+    pkpPublicKey: `0x${publicKey}`,
+    authMethod,
+    sessionSigsParams: {
+      chain: 'ethereum',
+      sessionKey,
+      resourceAbilityRequests: [{
+        resource: new LitPKPResource("*"),
+        ability: LitAbility.PKPSigning
+      }],
+    },
+  });
+  console.log(signatures);
+  
+  const res = await litNodeClient.executeJs({
+    code: `(async () => {
+      const sigShare = await LitActions.signEcdsa({
+        toSign,
+        publicKey,
+        sigName: "sig",
+      });
+    })();`,
+    sessionSigs: signatures,
+    jsParams: {
+      toSign: [1,2,3,4],
+      publicKey: publicKey as string,
+    },
+  });
+  console.log(res);
 } else if (process.argv.length >= 2 && process.argv.includes("--lookup")) {
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
   const sessionKey = litNodeClient.getSessionKey();
@@ -125,5 +156,3 @@ if (process.argv.length >= 3 && process.argv[2] === "--claim") {
   });
   console.log(res);
 }
-const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
-console.log(pkpInfo);

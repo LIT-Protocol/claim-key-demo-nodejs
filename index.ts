@@ -42,7 +42,7 @@ const stytchResponse = await client.otps.sms.loginOrCreate({
 const otpResponse = await prompts({
   type: "text",
   name: "code",
-  message: "Enter the code sent to your email:",
+  message: "Enter the code sent to your phone number:",
 });
 
 const authResponse = await client.otps.authenticate({
@@ -118,7 +118,7 @@ if (process.argv.includes("--claim")) {
     })();`,
     sessionSigs: signatures,
     jsParams: {
-      toSign: [1,2,3,4],
+      toSign: crypto.subtle.digest('SHA256', Buffer.from("hello world")),
       publicKey: publicKey as string,
     },
   });
@@ -150,7 +150,7 @@ if (process.argv.includes("--claim")) {
     })();`,
     sessionSigs: signatures,
     jsParams: {
-      toSign: [1,2,3,4],
+      toSign: crypto.subtle.digest('SHA-256', Buffer.from("hello world")),
       publicKey: publicKey as string,
     },
   });

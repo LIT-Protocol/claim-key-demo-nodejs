@@ -31,12 +31,12 @@ const client = new stytch.Client({
 
 const emailResponse = await prompts({
   type: "text",
-  name: "phone",
-  message: "Enter your phone number",
+  name: "email",
+  message: "Enter your email address",
 });
 
-const stytchResponse = await client.otps.sms.loginOrCreate({
-  phone_number: emailResponse.phone,
+const stytchResponse = await client.otps.email.loginOrCreate({
+  email: emailResponse.email,
 });
 
 const otpResponse = await prompts({
@@ -46,7 +46,7 @@ const otpResponse = await prompts({
 });
 
 const authResponse = await client.otps.authenticate({
-  method_id: stytchResponse.phone_id,
+  method_id: stytchResponse.email_id,
   code: otpResponse.code,
   session_duration_minutes: 60 * 24 * 7,
 });
@@ -61,7 +61,7 @@ const sessionStatus = await client.sessions.authenticate({
 
 const litNodeClient = new LitNodeClientNodeJs({
   litNetwork: "cayenne",
-  debug: false,
+  debug: true,
 });
 
 await litNodeClient.connect();
@@ -91,6 +91,8 @@ if (process.argv.includes("--claim")) {
   let claimResp = await session.claimKeyId({
     authMethod,
   });
+  console.log("sleeping for 30 seconds to allow for claim to propagate");
+  await new Promise((resolve) => setTimeout(resolve, 30000));
   console.log("claim response public key: ", claimResp.pubkey);
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
   const sessionKey = litNodeClient.getSessionKey();
@@ -98,16 +100,18 @@ if (process.argv.includes("--claim")) {
     pkpPublicKey: `0x${publicKey}`,
     authMethod,
     sessionSigsParams: {
-      chain: 'ethereum',
+      chain: "ethereum",
       sessionKey,
-      resourceAbilityRequests: [{
-        resource: new LitPKPResource("*"),
-        ability: LitAbility.PKPSigning
-      }],
+      resourceAbilityRequests: [
+        {
+          resource: new LitPKPResource("*"),
+          ability: LitAbility.PKPSigning,
+        },
+      ],
     },
   });
   console.log(signatures);
-  
+
   const res = await litNodeClient.executeJs({
     code: `(async () => {
       const sigShare = await LitActions.signEcdsa({
@@ -118,7 +122,10 @@ if (process.argv.includes("--claim")) {
     })();`,
     sessionSigs: signatures,
     jsParams: {
-      toSign: [1,2,3,4],
+      toSign: [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+      ],
       publicKey: publicKey as string,
     },
   });
@@ -130,16 +137,18 @@ if (process.argv.includes("--claim")) {
     pkpPublicKey: `0x${publicKey}`,
     authMethod,
     sessionSigsParams: {
-      chain: 'ethereum',
+      chain: "ethereum",
       sessionKey,
-      resourceAbilityRequests: [{
-        resource: new LitPKPResource("*"),
-        ability: LitAbility.PKPSigning
-      }],
+      resourceAbilityRequests: [
+        {
+          resource: new LitPKPResource("*"),
+          ability: LitAbility.PKPSigning,
+        },
+      ],
     },
   });
   console.log(signatures);
-  
+
   const res = await litNodeClient.executeJs({
     code: `(async () => {
       const sigShare = await LitActions.signEcdsa({
@@ -150,7 +159,10 @@ if (process.argv.includes("--claim")) {
     })();`,
     sessionSigs: signatures,
     jsParams: {
-      toSign: [1,2,3,4],
+      toSign: [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+      ],
       publicKey: publicKey as string,
     },
   });

@@ -122,10 +122,7 @@ if (process.argv.includes("--claim")) {
     })();`,
     sessionSigs: signatures,
     jsParams: {
-      toSign: [
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-      ],
+      toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
       publicKey: publicKey as string,
     },
   });
@@ -159,10 +156,7 @@ if (process.argv.includes("--claim")) {
     })();`,
     sessionSigs: signatures,
     jsParams: {
-      toSign: [
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-      ],
+      toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
       publicKey: publicKey as string,
     },
   });

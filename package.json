@@ -10,9 +10,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@lit-protocol/auth-helpers": "3.0.14",
-    "@lit-protocol/lit-auth-client": "3.0.14",
-    "@lit-protocol/types": "^2.2.47",
+    "@lit-protocol/lit-auth-client": "3.0.15",
+    "@lit-protocol/lit-node-client-nodejs": "3.0.15",
+    "@lit-protocol/pkp-ethers": "3.0.15",
     "@types/node": "^20.7.2",
     "@types/prompts": "^2.4.4",
     "ethers": "^5.7.2",

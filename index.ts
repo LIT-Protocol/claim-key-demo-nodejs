@@ -6,6 +6,7 @@ import prompts from "prompts";
 import * as stytch from "stytch";
 import { LitNodeClientNodeJs } from "@lit-protocol/lit-node-client-nodejs";
 import { ProviderType } from "@lit-protocol/constants";
+import { LitAbility, LitPKPResource } from "@lit-protocol/auth-helpers";
 
 /**
  * Should be defined in your local enviorment before running
@@ -19,7 +20,7 @@ if (!STYTCH_PROJECT_ID || !STYTCH_SECRET) {
   throw Error("Could not find stytch project secret or id in enviorment");
 }
 
-if (process.argv.length < 3) {
+if (process.argv.length < 2) {
   throw Error("Please provide either --lookup or --claim flag");
 }
 
@@ -31,7 +32,7 @@ const client = new stytch.Client({
 const emailResponse = await prompts({
   type: "text",
   name: "email",
-  message: "Enter your email:",
+  message: "Enter your email address",
 });
 
 const stytchResponse = await client.otps.email.loginOrCreate({
@@ -60,7 +61,7 @@ const sessionStatus = await client.sessions.authenticate({
 
 const litNodeClient = new LitNodeClientNodeJs({
   litNetwork: "cayenne",
-  debug: false,
+  debug: true,
 });
 
 await litNodeClient.connect();
@@ -86,12 +87,84 @@ const authMethod = await session.authenticate({
 const publicKey = await session.computePublicKeyFromAuthMethod(authMethod);
 console.log("local public key computed: ", publicKey);
 
-if (process.argv.length >= 3 && process.argv[2] === "--claim") {
+if (process.argv.includes("--claim")) {
   let claimResp = await session.claimKeyId({
     authMethod,
   });
+  console.log("sleeping for 30 seconds to allow for claim to propagate");
+  await new Promise((resolve) => setTimeout(resolve, 30000));
   console.log("claim response public key: ", claimResp.pubkey);
-} else if (process.argv.length >= 3 && process.argv[2] === "--lookup") {
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
-  console.log(pkpInfo);
+  const sessionKey = litNodeClient.getSessionKey();
+  const signatures = await session.getSessionSigs({
+    pkpPublicKey: `0x${publicKey}`,
+    authMethod,
+    sessionSigsParams: {
+      chain: "ethereum",
+      sessionKey,
+      resourceAbilityRequests: [
+        {
+          resource: new LitPKPResource("*"),
+          ability: LitAbility.PKPSigning,
+        },
+      ],
+    },
+  });
+  console.log(signatures);
+
+  const res = await litNodeClient.executeJs({
+    code: `(async () => {
+      const sigShare = await LitActions.signEcdsa({
+        toSign,
+        publicKey,
+        sigName: "sig",
+      });
+    })();`,
+    sessionSigs: signatures,
+    jsParams: {
+      toSign: [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+      ],
+      publicKey: publicKey as string,
+    },
+  });
+  console.log(res);
+} else if (process.argv.length >= 2 && process.argv.includes("--lookup")) {
+  const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
+  const sessionKey = litNodeClient.getSessionKey();
+  const signatures = await session.getSessionSigs({
+    pkpPublicKey: `0x${publicKey}`,
+    authMethod,
+    sessionSigsParams: {
+      chain: "ethereum",
+      sessionKey,
+      resourceAbilityRequests: [
+        {
+          resource: new LitPKPResource("*"),
+          ability: LitAbility.PKPSigning,
+        },
+      ],
+    },
+  });
+  console.log(signatures);
+
+  const res = await litNodeClient.executeJs({
+    code: `(async () => {
+      const sigShare = await LitActions.signEcdsa({
+        toSign,
+        publicKey,
+        sigName: "sig",
+      });
+    })();`,
+    sessionSigs: signatures,
+    jsParams: {
+      toSign: [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+      ],
+      publicKey: publicKey as string,
+    },
+  });
+  console.log(res);
 }

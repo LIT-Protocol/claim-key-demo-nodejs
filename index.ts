@@ -1,12 +1,15 @@
 import {
   LitAuthClient,
   StytchOtpProvider,
+  StytchAuthFactorOtpProvider
 } from "@lit-protocol/lit-auth-client/src/index.js";
 import prompts from "prompts";
 import * as stytch from "stytch";
 import { LitNodeClientNodeJs } from "@lit-protocol/lit-node-client-nodejs";
 import { ProviderType } from "@lit-protocol/constants";
 import { LitAbility, LitPKPResource } from "@lit-protocol/auth-helpers";
+//@ts-ignore
+const ls = await import('node-localstorage');
 
 /**
  * Should be defined in your local enviorment before running
@@ -35,8 +38,8 @@ const emailResponse = await prompts({
   message: "Enter your email address",
 });
 
-const stytchResponse = await client.otps.email.loginOrCreate({
-  email: emailResponse.email,
+const stytchResponse = await client.otps.sms.loginOrCreate({
+  phone_number: emailResponse.email,
 });
 
 const otpResponse = await prompts({
@@ -46,7 +49,7 @@ const otpResponse = await prompts({
 });
 
 const authResponse = await client.otps.authenticate({
-  method_id: stytchResponse.email_id,
+  method_id: stytchResponse.phone_id,
   code: otpResponse.code,
   session_duration_minutes: 60 * 24 * 7,
 });
@@ -62,6 +65,9 @@ const sessionStatus = await client.sessions.authenticate({
 const litNodeClient = new LitNodeClientNodeJs({
   litNetwork: "cayenne",
   debug: true,
+  storageProvider: {
+    provider: new ls.LocalStorage('./storage.db')
+  }
 });
 
 await litNodeClient.connect();
@@ -73,8 +79,8 @@ const authClient = new LitAuthClient({
   litNodeClient,
 });
 
-const session = authClient.initProvider<StytchOtpProvider>(
-  ProviderType.StytchOtp,
+const session = authClient.initProvider(
+  ProviderType.StytchSmsFactorOtp,
   {
     userId: sessionStatus.session.user_id,
     appId: STYTCH_PROJECT_ID,
@@ -112,30 +118,21 @@ if (process.argv.includes("--claim")) {
   });
   console.log(signatures);
 
-  const res = await litNodeClient.executeJs({
-    code: `(async () => {
-      const sigShare = await LitActions.signEcdsa({
-        toSign,
-        publicKey,
-        sigName: "sig",
-      });
-    })();`,
-    sessionSigs: signatures,
-    jsParams: {
-      toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
-      publicKey: publicKey as string,
-    },
+  const res = await litNodeClient.pkpSign({
+    pubKey: `0x${publicKey}`,
+    toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
+    sessionSigs: signatures
   });
+
   console.log(res);
 } else if (process.argv.length >= 2 && process.argv.includes("--lookup")) {
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
-  const sessionKey = litNodeClient.getSessionKey();
+  console.log("pkp info resolved: ", pkpInfo);
   const signatures = await session.getSessionSigs({
     pkpPublicKey: `0x${publicKey}`,
     authMethod,
     sessionSigsParams: {
       chain: "ethereum",
-      sessionKey,
       resourceAbilityRequests: [
         {
           resource: new LitPKPResource("*"),
@@ -146,19 +143,10 @@ if (process.argv.includes("--claim")) {
   });
   console.log(signatures);
 
-  const res = await litNodeClient.executeJs({
-    code: `(async () => {
-      const sigShare = await LitActions.signEcdsa({
-        toSign,
-        publicKey,
-        sigName: "sig",
-      });
-    })();`,
-    sessionSigs: signatures,
-    jsParams: {
-      toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
-      publicKey: publicKey as string,
-    },
-  });
+  const res = await litNodeClient.pkpSign({
+    pubKey: `0x${publicKey}`,
+    toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
+    sessionSigs: signatures
+  })
   console.log(res);
 }

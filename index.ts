@@ -38,8 +38,8 @@ const emailResponse = await prompts({
   message: "Enter your email address",
 });
 
-const stytchResponse = await client.otps.sms.loginOrCreate({
-  phone_number: emailResponse.email,
+const stytchResponse = await client.otps.email.loginOrCreate({
+  email: emailResponse.email,
 });
 
 const otpResponse = await prompts({
@@ -49,7 +49,7 @@ const otpResponse = await prompts({
 });
 
 const authResponse = await client.otps.authenticate({
-  method_id: stytchResponse.phone_id,
+  method_id: stytchResponse.email_id,
   code: otpResponse.code,
   session_duration_minutes: 60 * 24 * 7,
 });
@@ -80,7 +80,7 @@ const authClient = new LitAuthClient({
 });
 
 const session = authClient.initProvider(
-  ProviderType.StytchSmsFactorOtp,
+  ProviderType.StytchEmailFactorOtp,
   {
     userId: sessionStatus.session.user_id,
     appId: STYTCH_PROJECT_ID,
@@ -97,17 +97,35 @@ if (process.argv.includes("--claim")) {
   let claimResp = await session.claimKeyId({
     authMethod,
   });
-  console.log("sleeping for 30 seconds to allow for claim to propagate");
-  await new Promise((resolve) => setTimeout(resolve, 30000));
+
   console.log("claim response public key: ", claimResp.pubkey);
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
-  const sessionKey = litNodeClient.getSessionKey();
+  let matchingKey = pkpInfo.filter((info) => info.publicKey.replace('0x', '') === publicKey);
+  console.log("matching key from relayer look up: ", matchingKey);
+  const authNeededCallback = async (params: any) => {
+    const response = await litNodeClient.signSessionKey({
+      statement: params.statement,
+      authMethods: [
+        authMethod
+      ],
+      chainId: 1,
+      pkpPublicKey: `0x${publicKey}`,
+      resources: [
+        {
+          resource: new LitPKPResource("*"),
+          ability: LitAbility.PKPSigning,
+        } 
+      ]
+    });
+    return response.authSig;
+  };
   const signatures = await session.getSessionSigs({
     pkpPublicKey: `0x${publicKey}`,
     authMethod,
+    //@ts-ignore
     sessionSigsParams: {
       chain: "ethereum",
-      sessionKey,
+      authNeededCallback,
       resourceAbilityRequests: [
         {
           resource: new LitPKPResource("*"),
@@ -128,18 +146,36 @@ if (process.argv.includes("--claim")) {
 } else if (process.argv.length >= 2 && process.argv.includes("--lookup")) {
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
   console.log("pkp info resolved: ", pkpInfo);
-  const signatures = await session.getSessionSigs({
-    pkpPublicKey: `0x${publicKey}`,
-    authMethod,
-    sessionSigsParams: {
-      chain: "ethereum",
-      resourceAbilityRequests: [
+  let matchingKey = pkpInfo.filter((info) => info.publicKey.replace('0x', '') === publicKey);
+  console.log("matching key from relayer look up: ", matchingKey);
+  const authNeededCallback = async (params: any) => {
+    const response = await litNodeClient.signSessionKey({
+      statement: params.statement,
+      authMethods: [
+        authMethod
+      ],
+      chainId: 1,
+      pkpPublicKey: `0x${publicKey}`,
+      resources: [
         {
           resource: new LitPKPResource("*"),
           ability: LitAbility.PKPSigning,
-        },
-      ],
-    },
+        } 
+      ]
+    });
+    return response.authSig;
+  };
+  const signatures = await litNodeClient.getSessionSigs(
+    //@ts-ignore
+    {
+    chain: "ethereum",
+    authNeededCallback,
+    resourceAbilityRequests: [
+      {
+        resource: new LitPKPResource("*"),
+        ability: LitAbility.PKPSigning,
+      },
+    ]
   });
   console.log(signatures);
 

@@ -7,7 +7,7 @@ import prompts from "prompts";
 import * as stytch from "stytch";
 import { LitNodeClientNodeJs } from "@lit-protocol/lit-node-client-nodejs";
 import { ProviderType } from "@lit-protocol/constants";
-import { LitAbility, LitPKPResource } from "@lit-protocol/auth-helpers";
+import { LitAbility, LitPKPResource, LitActionResource } from "@lit-protocol/auth-helpers";
 //@ts-ignore
 const ls = await import('node-localstorage');
 
@@ -110,12 +110,7 @@ if (process.argv.includes("--claim")) {
       ],
       chainId: 1,
       pkpPublicKey: `0x${publicKey}`,
-      resources: [
-        {
-          resource: new LitPKPResource("*"),
-          ability: LitAbility.PKPSigning,
-        } 
-      ]
+      resources: params.resources 
     });
     return response.authSig;
   };
@@ -156,12 +151,7 @@ if (process.argv.includes("--claim")) {
       ],
       chainId: 1,
       pkpPublicKey: `0x${publicKey}`,
-      resources: [
-        {
-          resource: new LitPKPResource("*"),
-          ability: LitAbility.PKPSigning,
-        } 
-      ]
+      resources: params.resources
     });
     return response.authSig;
   };
@@ -172,7 +162,7 @@ if (process.argv.includes("--claim")) {
     authNeededCallback,
     resourceAbilityRequests: [
       {
-        resource: new LitPKPResource("*"),
+        resource: new LitActionResource("*"),
         ability: LitAbility.PKPSigning,
       },
     ]

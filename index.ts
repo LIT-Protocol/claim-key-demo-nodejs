@@ -8,6 +8,11 @@ import * as stytch from "stytch";
 import { LitNodeClientNodeJs } from "@lit-protocol/lit-node-client-nodejs";
 import { ProviderType } from "@lit-protocol/constants";
 import { LitAbility, LitPKPResource, LitActionResource } from "@lit-protocol/auth-helpers";
+import { PKPEthersWallet } from "@lit-protocol/pkp-ethers";
+import { LitContracts } from "@lit-protocol/contracts-sdk";
+import {ethers} from 'ethers';
+import * as siwe from 'siwe';
+
 //@ts-ignore
 const ls = await import('node-localstorage');
 
@@ -173,6 +178,106 @@ if (process.argv.includes("--claim")) {
     pubKey: `0x${publicKey}`,
     toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
     sessionSigs: signatures
-  })
-  console.log(res);
+  });
+  //contracts.pkpPermissionsContract.write.addPermittedAuthMethod()
+} else if (process.argv.length >= 2 && process.argv.includes("--add-auth")) {
+  const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
+  console.log("pkp info resolved: ", pkpInfo);
+  let matchingKey = pkpInfo.filter((info) => info.publicKey.replace('0x', '') === publicKey);
+  console.log("matching key from relayer look up: ", matchingKey);
+  const authNeededCallback = async (params: any) => {
+    const response = await litNodeClient.signSessionKey({
+      statement: params.statement,
+      authMethods: [
+        authMethod
+      ],
+      chainId: 1,
+      pkpPublicKey: `0x${publicKey}`,
+      resources: params.resources
+    });
+    return response.authSig;
+  };
+  const signatures = await litNodeClient.getSessionSigs(
+    //@ts-ignore
+    {
+    chain: "ethereum",
+    authNeededCallback,
+    resourceAbilityRequests: [
+      {
+        resource: new LitActionResource("*"),
+        ability: LitAbility.PKPSigning,
+      },
+    ]
+  });
+  console.log(signatures);
+
+  const res = await litNodeClient.pkpSign({
+    pubKey: `0x${publicKey}`,
+    toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
+    sessionSigs: signatures
+  });
+
+  const pkpWallet = new PKPEthersWallet({
+    controllerSessionSigs: signatures,
+    pkpPubKey: `0x${publicKey}`,
+    controllerAuthMethods: [],
+  });
+
+  await pkpWallet.init();
+  
+  const contracts = new LitContracts({
+    signer: pkpWallet,
+    network: 'cayenne',
+    rpc: 'https://chain-rpc.litprotocol.com/http',
+  });
+
+  const phoneResponse = await prompts({
+    type: "text",
+    name: "phone",
+    message: "Enter your phone number (with area code): ",
+  });
+  
+  const phoneStytchResponse = await client.otps.sms.loginOrCreate({
+    phone_number: phoneResponse.phone,
+  });
+
+
+  const phoneOtpResponse = await prompts({
+    type: "text",
+    name: "code",
+    message: "Enter the code sent to your phone:",
+  });
+  
+  const authResponse = await client.otps.authenticate({
+    method_id: phoneStytchResponse.phone_id,
+    code: phoneOtpResponse.code,
+    session_duration_minutes: 60 * 24 * 7,
+  });
+  
+  
+  const sessionStatus = await client.sessions.authenticate({
+    session_token: authResponse.session_token,
+  });
+
+  let authMethodId = await StytchAuthFactorOtpProvider.authMethodId({
+    accessToken: sessionStatus.session_jwt,
+    authMethodType: 11
+  });
+
+  console.log("auth method id for phone: ", authMethodId);
+  await contracts.connect();
+  const tx = await contracts.pkpPermissionsContract.write.addPermittedAuthMethod(
+    ethers.BigNumber.from(matchingKey[0].tokenId),
+    {
+      authMethodType: 11,
+      id: authMethodId,
+      userPubkey: '0x'
+    },
+    [ethers.BigNumber.from("1")],
+    {gasLimit: 100000}
+  );
+  let reciept = await tx.wait();
+
+  console.log("auth method ", reciept);
 }
+

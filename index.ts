@@ -1,17 +1,11 @@
 import {
   LitAuthClient,
-  StytchOtpProvider,
-  StytchAuthFactorOtpProvider
 } from "@lit-protocol/lit-auth-client/src/index.js";
 import prompts from "prompts";
 import * as stytch from "stytch";
 import { LitNodeClientNodeJs } from "@lit-protocol/lit-node-client-nodejs";
 import { ProviderType } from "@lit-protocol/constants";
 import { LitAbility, LitPKPResource, LitActionResource } from "@lit-protocol/auth-helpers";
-import { PKPEthersWallet } from "@lit-protocol/pkp-ethers";
-import { LitContracts } from "@lit-protocol/contracts-sdk";
-import {ethers} from 'ethers';
-import * as siwe from 'siwe';
 
 //@ts-ignore
 const ls = await import('node-localstorage');

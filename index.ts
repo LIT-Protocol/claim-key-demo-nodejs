@@ -131,40 +131,30 @@ if (process.argv.includes("--claim")) {
     (info) => info.publicKey.replace("0x", "") === publicKey
   );
   console.log("matching key from relayer look up: ", matchingKey);
-  const authNeededCallback = async (params: any) => {
-    const response = await litNodeClient.signSessionKey({
-      statement: params.statement,
-      authMethods: [authMethod],
-      chainId: 1,
-      pkpPublicKey: `0x${publicKey}`,
-      resources: params.resources,
-    });
-    return response.authSig;
-  };
-  const signatures = await litNodeClient.getSessionSigs(
-    //@ts-ignore
-    {
-      chain: "ethereum",
-      authNeededCallback,
-      resourceAbilityRequests: [
-        {
-          resource: new LitActionResource("*"),
-          ability: LitAbility.PKPSigning,
-        },
-      ],
-    }
-  );
-  console.log(signatures);
+
+  // calculate token id of PKP
+  const tokenId = ethers.utils.keccak256(`0x${publicKey}`).substring(2);
+
+  // get session sigs for PKP
+  const sessionSigs = await litNodeClient.getPkpSessionSigs({
+    authMethods: [authMethod],
+    pkpPublicKey: `0x${publicKey}`,
+    chain: "ethereum",
+    resourceAbilityRequests: [
+      {
+        resource: new LitPKPResource(tokenId),
+        ability: LitAbility.PKPSigning,
+      },
+    ],
+  });
 
   const res = await litNodeClient.pkpSign({
     pubKey: `0x${publicKey}`,
-    toSign: new Uint8Array(
-      await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode("Hello world")
-      )
+    toSign: ethers.utils.arrayify(
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes("Hello world"))
     ),
-    sessionSigs: signatures,
+    sessionSigs,
   });
+  console.log(res);
   process.exit(0);
 }

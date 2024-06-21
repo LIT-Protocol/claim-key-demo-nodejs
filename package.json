@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.ts",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "npx tsx index.ts"
   },

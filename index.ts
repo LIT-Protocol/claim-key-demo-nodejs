@@ -1,14 +1,17 @@
-import {
-  LitAuthClient,
-} from "@lit-protocol/lit-auth-client/src/index.js";
+import { LitAuthClient } from "@lit-protocol/lit-auth-client/src/index.js";
 import prompts from "prompts";
 import * as stytch from "stytch";
 import { LitNodeClientNodeJs } from "@lit-protocol/lit-node-client-nodejs";
 import { ProviderType } from "@lit-protocol/constants";
-import { LitAbility, LitPKPResource, LitActionResource } from "@lit-protocol/auth-helpers";
+import {
+  LitAbility,
+  LitPKPResource,
+  LitActionResource,
+} from "@lit-protocol/auth-helpers";
+import { ethers } from "ethers";
 
 //@ts-ignore
-const ls = await import('node-localstorage');
+const ls = await import("node-localstorage");
 
 /**
  * Should be defined in your local enviorment before running
@@ -65,8 +68,8 @@ const litNodeClient = new LitNodeClientNodeJs({
   litNetwork: "cayenne",
   debug: true,
   storageProvider: {
-    provider: new ls.LocalStorage('./storage.db')
-  }
+    provider: new ls.LocalStorage("./storage.db"),
+  },
 });
 
 await litNodeClient.connect();
@@ -78,13 +81,10 @@ const authClient = new LitAuthClient({
   litNodeClient,
 });
 
-const session = authClient.initProvider(
-  ProviderType.StytchEmailFactorOtp,
-  {
-    userId: sessionStatus.session.user_id,
-    appId: STYTCH_PROJECT_ID,
-  }
-);
+const session = authClient.initProvider(ProviderType.StytchEmailFactorOtp, {
+  userId: sessionStatus.session.user_id,
+  appId: STYTCH_PROJECT_ID,
+});
 
 const authMethod = await session.authenticate({
   accessToken: sessionStatus.session_jwt,
@@ -97,43 +97,29 @@ if (process.argv.includes("--claim")) {
     authMethod,
   });
 
-  console.log("claim response public key: ", claimResp.pubkey);
-  const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
-  let matchingKey = pkpInfo.filter((info) => info.publicKey.replace('0x', '') === publicKey);
-  console.log("matching key from relayer look up: ", matchingKey);
-  const authNeededCallback = async (params: any) => {
-    const response = await litNodeClient.signSessionKey({
-      statement: params.statement,
-      authMethods: [
-        authMethod
-      ],
-      chainId: 1,
-      pkpPublicKey: `0x${publicKey}`,
-      resources: params.resources 
-    });
-    return response.authSig;
-  };
-  const signatures = await session.getSessionSigs({
-    pkpPublicKey: `0x${publicKey}`,
-    authMethod,
-    //@ts-ignore
-    sessionSigsParams: {
-      chain: "ethereum",
-      authNeededCallback,
-      resourceAbilityRequests: [
-        {
-          resource: new LitPKPResource("*"),
-          ability: LitAbility.PKPSigning,
-        },
-      ],
-    },
-  });
-  console.log(signatures);
+  // calculate token id of PKP
+  const tokenId = ethers.utils.keccak256(`0x${publicKey}`).substring(2);
 
+  // get session sigs for PKP
+  const sessionSigs = await litNodeClient.getPkpSessionSigs({
+    authMethods: [authMethod],
+    pkpPublicKey: `0x${publicKey}`,
+    chain: "ethereum",
+    resourceAbilityRequests: [
+      {
+        resource: new LitPKPResource(tokenId),
+        ability: LitAbility.PKPSigning,
+      },
+    ],
+  });
+
+  // sign using session sigs
   const res = await litNodeClient.pkpSign({
     pubKey: `0x${publicKey}`,
-    toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
-    sessionSigs: signatures
+    toSign: ethers.utils.arrayify(
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes("Hello world"))
+    ),
+    sessionSigs,
   });
 
   console.log(res);
@@ -141,39 +127,34 @@ if (process.argv.includes("--claim")) {
 } else if (process.argv.length >= 2 && process.argv.includes("--lookup")) {
   const pkpInfo = await session.fetchPKPsThroughRelayer(authMethod);
   console.log("pkp info resolved: ", pkpInfo);
-  let matchingKey = pkpInfo.filter((info) => info.publicKey.replace('0x', '') === publicKey);
+  let matchingKey = pkpInfo.filter(
+    (info) => info.publicKey.replace("0x", "") === publicKey
+  );
   console.log("matching key from relayer look up: ", matchingKey);
-  const authNeededCallback = async (params: any) => {
-    const response = await litNodeClient.signSessionKey({
-      statement: params.statement,
-      authMethods: [
-        authMethod
-      ],
-      chainId: 1,
-      pkpPublicKey: `0x${publicKey}`,
-      resources: params.resources
-    });
-    return response.authSig;
-  };
-  const signatures = await litNodeClient.getSessionSigs(
-    //@ts-ignore
-    {
+
+  // calculate token id of PKP
+  const tokenId = ethers.utils.keccak256(`0x${publicKey}`).substring(2);
+
+  // get session sigs for PKP
+  const sessionSigs = await litNodeClient.getPkpSessionSigs({
+    authMethods: [authMethod],
+    pkpPublicKey: `0x${publicKey}`,
     chain: "ethereum",
-    authNeededCallback,
     resourceAbilityRequests: [
       {
-        resource: new LitActionResource("*"),
+        resource: new LitPKPResource(tokenId),
         ability: LitAbility.PKPSigning,
       },
-    ]
+    ],
   });
-  console.log(signatures);
 
   const res = await litNodeClient.pkpSign({
     pubKey: `0x${publicKey}`,
-    toSign: new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("Hello world"))),
-    sessionSigs: signatures
+    toSign: ethers.utils.arrayify(
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes("Hello world"))
+    ),
+    sessionSigs,
   });
+  console.log(res);
   process.exit(0);
-} 
-
+}
